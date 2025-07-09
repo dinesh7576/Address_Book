@@ -23,20 +23,31 @@ def strings_analysis(fp):
             print(f"    - {s}")
     except Exception as e:
         print(f"  strings scan failed: {e}")
+    print(f"  strings scan success")
     print()
 
-def binwalk_scan(fp):
-    print("🧩 Binwalk signature + entropy scan...")
-    scans = binwalk.scan(fp, signature=True, entropy=True, quiet=True, nplot=True)
-    for module in scans:
-        print(f"\n== {module.name} ==")
+def binwalk_scan(firmware_path):
+    # Run both signature and entropy scans quietly
+    modules = binwalk.scan(firmware_path, signature=True, entropy=True, quiet=True)
+
+    for module in modules:
+        print(f"Module: {module.name}")
         for res in module.results:
-            offset = hex(res.offset)
-            size = res.size
-            description = res.description
-            print(f"  Offset: {offset}, Size: {size}, Description: {description}")
-    print()
-
+            # Parse res.description to float if it's entropy, or just use description for signatures
+            desc = res.description.strip()
+            try:
+                entropy = float(desc)
+                # Use thresholds
+                if entropy < 0.523:
+                    status = "low entropy"
+                elif entropy > 0.697:
+                    status = "high entropy"
+                else:
+                    status = "moderate entropy"
+                print(f"  Offset: 0x{res.offset:X}, Entropy: {entropy:.3f} -> {status}")
+            except ValueError:
+                # Not a numeric description – likely a signature
+                print(f"  Offset: 0x{res.offset:X}, Signature: {desc}")
 def main():
     if len(sys.argv) != 2:
         print("Usage: analyze_firmware.py <firmware.bin>")
